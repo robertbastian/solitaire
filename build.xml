@@ -1,0 +1,82 @@
+<project name='OOP Vacation Practical' default='compile' basedir='.'>
+
+  <property name="mainClass" value="Solitaire.View.Solitaire"/>
+  <property name="testClasses" value=""/>
+  <property name="reportFiles" value=""/>
+  <property name="printClasses" value="Model/*.java View/*.java"/>
+
+  <property name="src" location="src"/>
+  <property name="build" location="classes"/>
+  <property name="tests" value="tests"/>
+  <property environment="env" />
+
+  <target name="init">
+    <mkdir dir="${build}"/>
+  </target>
+
+  <target name="clean">
+    <delete dir="${build}"/>
+  </target>
+
+  <target name="compile" depends="init">
+    <javac srcdir="${src}" destdir="${build}" classpath="${env.CLASSPATH}" includeantruntime='no'/>
+  </target>
+
+  <target name="run" depends="compile">
+    <java classname="${mainClass}" classpath="${build}" fork="yes">
+      <assertions>
+        <enable/>
+      </assertions>
+    </java>
+  </target>
+
+  <target name='test' depends='compile'>
+    <exec executable='java' dir='${build}'>
+      <arg line="org.junit.runner.JUnitCore ${testClasses}"/>
+    </exec>
+  </target>
+
+  <target name="report">
+    <echo message="Creating report .pdf"/>
+    <exec executable="osascript">
+      <arg value="-e"/><arg value='set f to POSIX file "${basedir}/Report.pages"'/>
+      <arg value="-e"/><arg value='set t to POSIX file "${basedir}/tempReport.pdf"'/>
+      <arg value="-e"/><arg value='tell application "Pages"'/>
+      <arg value="-e"/><arg value=' export (open f) to t as PDF'/>
+      <arg value="-e"/><arg value='	close front document'/>
+      <arg value="-e"/><arg value='end tell'/>
+    </exec>
+    <echo message="Converting code to .ps"/>
+    <apply executable="vim" parallel="false" output="/dev/null">
+      <srcfile/>
+      <arg line="-c ':set number' -c ':hardcopy > %.ps' -c ':q'"/>
+      <fileset dir="${src}" includes="${printClasses}"/>
+    </apply>
+    <echo message="Converting .ps to .pdf"/>
+    <apply executable="pstopdf" parallel="false">
+      <srcfile/>
+      <fileset dir="${src}" includes="**/*.ps"/>
+    </apply>
+    <echo message="Merging report, additional files and code"/>
+    <apply executable='pdfmerge' parallel="true">
+      <arg line="-o Report.pdf tempReport.pdf ${reportFiles}"/>
+      <srcfile/>
+      <fileset dir="${src}" includes="**/*.pdf"/>
+    </apply>
+    <echo message="Removing temporary files"/>
+    <apply executable='rm' parallel="false">
+      <srcfile/>
+      <fileset dir="${src}" includes="**/*.pdf **/*.ps"/>
+    </apply>
+    <exec executable="rm">
+      <arg value="tempReport.pdf"/>
+    </exec>
+  </target>
+
+  <target name="print" depends="report">
+    <input>Press return to print in Thom Lab</input>
+    <exec executable="ssh" input="Report.pdf">
+      <arg line="ecs 'lpr -Ptp1'"/>
+    </exec>
+  </target>
+</project>
